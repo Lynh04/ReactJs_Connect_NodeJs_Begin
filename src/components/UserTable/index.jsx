@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Table,
   TableHeader,
@@ -10,70 +10,125 @@ import {
 import { SquarePen, Trash2 } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import UserDialog from "@/components/UserDialog";
+import Header from "@/components/Header";
+import { getAllUsers, getUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "../../services/api/apiUsers.js";
+import { Toaster, toast } from "react-hot-toast";
 
 const UserTable = () => {
   const [users, setUsers] = React.useState([]);
-
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState(null);
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState(null);
   const [isAddOpen, setIsAddOpen] = React.useState(false);
 
-  const handleDeleteClick = (user) => {
-    setSelectedUser(user);
-    setIsConfirmOpen(true);
+  // Fetch all users from API
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await getAllUsers();
+      setUsers(data);
+    } catch (err) {
+      setError("Không thể tải danh sách người dùng.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleAddUser = (user) => {
-    const createdAt = new Date().toLocaleDateString("en-GB");
-    setUsers((prev) => {
-      const nextId = prev.length ? Math.max(...prev.map((u) => u.id)) + 1 : 1;
-      return [
-        ...prev,
-        {
-          id: nextId,
-          name: user.name,
-          email: user.email,
-          age: Number(user.age),
-          createdAt,
-        },
-      ];
-    });
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Handle add user (creation only)
+  const handleAddUser = async (user) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await apiCreateUser(user);
+      await fetchUsers();
+      setIsAddOpen(false);
+      toast.success("Đã thêm mới người dùng thành công");
+    } catch (err) {
+      setError("Thêm người dùng thất bại.");
+      toast.error("Thêm người dùng thất bại");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleConfirmDelete = () => {
-    if (!selectedUser) return;
-    setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
-    setSelectedUser(null);
-  };
-
+  // Handle edit user
   const handleEditClick = (user) => {
     setEditingUser(user);
     setIsEditOpen(true);
   };
 
-  const handleUpdateUser = (updated) => {
+  const handleUpdateUser = async (updated) => {
     if (!editingUser) return;
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === editingUser.id
-          ? {
-              ...u,
-              name: updated.name,
-              email: updated.email,
-              age: Number(updated.age),
-            }
-          : u,
-      ),
-    );
+    setIsLoading(true);
+    setError(null);
+    try {
+      await apiUpdateUser(editingUser._id, updated);
+      await fetchUsers();
+      setIsEditOpen(false);
+      toast.success("Cập nhật người dùng thành công");
+    } catch (err) {
+      setError("Cập nhật người dùng thất bại.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // ...existing code...
+  // Handle delete user
+  const handleDeleteClick = (user) => {
+    setSelectedUser(user);
+    setIsConfirmOpen(true);
+  };
 
-  //crate function loadUsers from localStorage => setUsers
+  const handleConfirmDelete = async () => {
+    if (!selectedUser) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await apiDeleteUser(selectedUser._id);
+      await fetchUsers();
+      setIsConfirmOpen(false);
+      setSelectedUser(null);
+      toast.success("Xóa người dùng thành công");
+    } catch (err) {
+      setError("Xóa người dùng thất bại.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCloseEdit = (open) => {
+    setIsEditOpen(open);
+    if (!open) {
+      setTimeout(() => setEditingUser(null), 200); // clear after animation
+    }
+  };
+
   return (
     <>
+      <Toaster
+        position="bottom-center"
+        reverseOrder={false}
+      />
+      <Header>
+        {/* Add User Dialog Triggered inside Header */}
+        <UserDialog
+          open={isAddOpen}
+          onOpenChange={setIsAddOpen}
+          handleOnSubmit={handleAddUser}
+          title="Thêm người dùng mới"
+          submitText="Thêm mới"
+          cancelText="Hủy bỏ"
+        />
+      </Header>
+
       <ConfirmDialog
         open={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}
@@ -82,26 +137,20 @@ const UserTable = () => {
         description="Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể hoàn tác."
       />
 
-      {/* Header Danh sách */}
+      {/* Loading and error states */}
+      {isLoading && (
+        <div className="p-4 text-center text-gray-500">Đang tải dữ liệu...</div>
+      )}
+      {error && (
+        <div className="p-4 text-center text-red-500">{error}</div>
+      )}
 
-      <UserDialog
-        open={isAddOpen}
-        onOpenChange={setIsAddOpen}
-        onSubmit={handleAddUser}
-        title="Thêm người dùng mới"
-        submitText="Thêm mới"
-        cancelText="Hủy bỏ"
-        trigger={<div className="hidden"></div>}
-        setUsers={setUsers}
-        users={users}
-      />
-
-      {/* Dialog Edit (Không hiện trigger) */}
+      {/* Edit User Dialog */}
       <UserDialog
         open={isEditOpen}
-        onOpenChange={setIsEditOpen}
+        onOpenChange={handleCloseEdit}
         initialData={editingUser ?? { name: "", email: "", age: "" }}
-        onSubmit={handleUpdateUser}
+        handleOnSubmit={handleUpdateUser}
         title="Cập nhật thông tin"
         submitText="Cập nhật"
         cancelText="Hủy bỏ"
@@ -129,7 +178,7 @@ const UserTable = () => {
           <TableBody>
             {users.map((u) => (
               <TableRow
-                key={u.id}
+                key={u._id}
                 className="hover:bg-gray-50/50 transition-colors"
               >
                 <TableCell className="py-4 px-6">
@@ -144,7 +193,7 @@ const UserTable = () => {
                   {u.age}
                 </TableCell>
                 <TableCell className="px-6 py-4 text-gray-400 text-xs font-mono">
-                  {u.createdAt}
+                  {new Date(u.createdAt).toLocaleDateString("vi-VN")}
                 </TableCell>
                 <TableCell className="text-right">
                   <button
@@ -168,5 +217,4 @@ const UserTable = () => {
     </>
   );
 };
-
 export default UserTable;

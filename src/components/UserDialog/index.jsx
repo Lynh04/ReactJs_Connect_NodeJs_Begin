@@ -21,14 +21,13 @@ const DEFAULT_INITIAL = {
 const UserDialog = ({
   open,
   onOpenChange,
-  onSubmit,
+  handleOnSubmit,
   initialData = DEFAULT_INITIAL,
   trigger,
   title = "Thêm người dùng mới",
   triggerText = "Thêm mới",
   submitText = "Tạo mới",
   cancelText = "Hủy bỏ",
-  setUsers,
 }) => {
   const [internalOpen, setInternalOpen] = React.useState(false);
   const isControlled = open !== undefined && onOpenChange !== undefined;
@@ -46,11 +45,7 @@ const UserDialog = ({
     setAge(initialData.age ?? "");
   }, [dialogOpen, initialData]);
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    onSubmit?.({ name, email, age });
-    setDialogOpen(false);
-  };
+
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -76,7 +71,12 @@ const UserDialog = ({
         </DialogHeader>
 
         <div>
-          <form className="p-6 space-y-4" onSubmit={handleSubmit}>
+          <form className="p-6 space-y-4" onSubmit={(e) => {
+            e.preventDefault();
+            if (handleOnSubmit) {
+              handleOnSubmit({ name, email, age });
+            }
+          }}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Họ và tên

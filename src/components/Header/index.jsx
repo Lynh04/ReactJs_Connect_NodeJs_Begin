@@ -1,7 +1,8 @@
-import UserDialog from "@/components/UserDialog";
+import React from "react";
 
-export default function UserListHeader() {
+export default function UserListHeader({ children }) {
   return (
+
     <div className="flex flex-row items-center justify-between mb-8">
       {/* Cụm Tiêu đề và Mô tả */}
       <div className="space-y-1">
@@ -13,8 +14,8 @@ export default function UserListHeader() {
         </p>
       </div>
 
-      {/* Nút Thêm mới */}
-      <UserDialog />
+      {/* Actions */}
+      {children}
     </div>
   );
 }
